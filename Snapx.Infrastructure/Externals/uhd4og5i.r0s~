@@ -1,0 +1,71 @@
+﻿using Snapx.Application.Interfaces;
+using Snapx.Domain.Enums;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Snapx.Infrastructure.Externals
+{
+    public class YtDlpDownloader : IVideoDownloader
+    {
+        private readonly string _tempFolder = = "/tmp/video-temp";
+        private readonly string _ytDlpPath;
+        private readonly string _ffmpegPath;
+
+        public YtDlpDownloader()
+        {
+            var baseDir = AppContext.BaseDirectory;
+            _ytDlpPath = Path.Combine(baseDir, "Tools", "yt-dlp.exe");
+            _ffmpegPath = Path.Combine(baseDir, "Tools", "ffmpeg.exe");
+
+            if (!File.Exists(_ytDlpPath))
+                throw new FileNotFoundException("yt-dlp.exe not found in output directory.", _ytDlpPath);
+
+            if (!File.Exists(_ffmpegPath))
+                throw new FileNotFoundException("ffmpeg.exe not found in output directory.", _ffmpegPath);
+        }
+
+        public async Task<string> DownloadAsync(string url)
+        {
+            Directory.CreateDirectory(_tempFolder);
+
+            var outputFile = Path.Combine(_tempFolder, $"download_{Guid.NewGuid():N}.%(ext)s");
+            var ffmpegDir = Path.GetDirectoryName(_ffmpegPath);
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = _ytDlpPath,
+                Arguments = $"--ffmpeg-location \"{ffmpegDir}\" -o \"{outputFile}\" \"{url}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null)
+                throw new InvalidOperationException("Failed to start yt-dlp process.");
+
+            string stdOut = await process.StandardOutput.ReadToEndAsync();
+            string stdErr = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode != 0)
+                throw new Exception($"yt-dlp failed: {stdErr}");
+
+            // Tìm file vừa tải về
+            var downloadedFiles = Directory.GetFiles(_tempFolder)
+                                           .OrderByDescending(File.GetCreationTimeUtc)
+                                           .ToList();
+
+            if (!downloadedFiles.Any())
+                throw new Exception("No file was downloaded.");
+
+            return downloadedFiles.First();
+        }
+
+    }
+}

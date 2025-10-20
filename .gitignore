@@ -1,0 +1,29 @@
+# Build results
+bin/
+obj/
+Debug/
+Release/
+
+# Visual Studio cache
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider IDE
+.idea/
+
+# NuGet
+*.nupkg
+packages/
+*.snupkg
+
+# ASP.NET / IIS
+*.log
+*.vspscc
+
+# Others
+*.DS_Store
+*.env
+*.vscode/
