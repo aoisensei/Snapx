@@ -36,7 +36,7 @@ namespace Snapx.Application.Services
             //if (platform == "TikTok")
             //    outputFile = await _processor.RemoveTikTokWatermarkAsync(tempFile);
 
-            _cleaner.ScheduleCleanup(outputFile, TimeSpan.FromMinutes(5));
+            await _cleaner.CleanupTemp(outputFile);
 
             return new MediaDownloadResponseDto
             {
