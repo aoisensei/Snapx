@@ -8,6 +8,6 @@ namespace Snapx.Application.Interfaces
 {
     public interface ITempCleaner
     {
-        void ScheduleCleanup(string filePath, TimeSpan delay);
+        Task CleanupTemp(string filePath);
     }
 }
