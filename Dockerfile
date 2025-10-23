@@ -32,19 +32,13 @@ RUN dotnet publish "Snapx.Api.csproj" -c Release -o /app/publish /p:UseAppHost=f
 FROM base AS final
 WORKDIR /app
 
-# Install required packages
+# Install required packages (yt-dlp and ffmpeg via APT on Debian/Ubuntu base)
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
     wget \
-    python3 \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install yt-dlp
-RUN pip3 install yt-dlp
-
-# Install ffmpeg
-RUN apt-get update && apt-get install -y \
     ffmpeg \
+    yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the published application

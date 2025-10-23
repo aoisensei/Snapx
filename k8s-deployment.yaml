@@ -17,6 +17,7 @@ spec:
       containers:
       - name: snapx-api
         image: snapx-api:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
           name: http
@@ -25,6 +26,12 @@ spec:
           value: "Production"
         - name: ASPNETCORE_URLS
           value: "http://+:80"
+        - name: FFMPEG_PATH
+          value: "ffmpeg"
+        - name: FFPROBE_PATH
+          value: "ffprobe"
+        - name: YTDLP_PATH
+          value: "yt-dlp"
         resources:
           requests:
             memory: "512Mi"

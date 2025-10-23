@@ -16,14 +16,38 @@ namespace Snapx.Infrastructure.Externals
 
         public FfmpegProcessor()
         {
-            var baseDir = AppContext.BaseDirectory;
-            _ffmpegPath = Path.Combine(baseDir, "Tools", "ffmpeg.exe");
-            _ffprobePath = Path.Combine(baseDir, "Tools", "ffprobe.exe");
+            var envFfmpeg = Environment.GetEnvironmentVariable("FFMPEG_PATH");
+            var envFfprobe = Environment.GetEnvironmentVariable("FFPROBE_PATH");
 
-            if (!File.Exists(_ffmpegPath))
-                throw new FileNotFoundException("ffmpeg.exe not found in output directory.", _ffmpegPath);
-            if (!File.Exists(_ffprobePath))
-                throw new FileNotFoundException("ffprobe.exe not found in output directory.", _ffprobePath);
+            if (!string.IsNullOrWhiteSpace(envFfmpeg))
+            {
+                _ffmpegPath = envFfmpeg;
+            }
+            else if (OperatingSystem.IsWindows())
+            {
+                var baseDir = AppContext.BaseDirectory;
+                var winFfmpeg = Path.Combine(baseDir, "Tools", "ffmpeg.exe");
+                _ffmpegPath = File.Exists(winFfmpeg) ? winFfmpeg : "ffmpeg.exe";
+            }
+            else
+            {
+                _ffmpegPath = "ffmpeg";
+            }
+
+            if (!string.IsNullOrWhiteSpace(envFfprobe))
+            {
+                _ffprobePath = envFfprobe;
+            }
+            else if (OperatingSystem.IsWindows())
+            {
+                var baseDir = AppContext.BaseDirectory;
+                var winFfprobe = Path.Combine(baseDir, "Tools", "ffprobe.exe");
+                _ffprobePath = File.Exists(winFfprobe) ? winFfprobe : "ffprobe.exe";
+            }
+            else
+            {
+                _ffprobePath = "ffprobe";
+            }
         }
 
         public async Task<string> RemoveTikTokWatermarkAsync(string inputPath)

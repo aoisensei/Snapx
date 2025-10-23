@@ -9,6 +9,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructure();
+builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
@@ -17,10 +18,12 @@ app.UseSwagger();
 app.UseSwaggerUI();
 app.UseStaticFiles();
 
-app.UseHttpsRedirection();
+// Disable HTTPS redirection inside container to avoid probe failures
+// app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.Run();
