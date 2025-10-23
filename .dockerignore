@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+
+# IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+**/TempStorage/
+temp/
+tmp/
+
+# Docker files
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Kubernetes files
+k8s-*.yaml
+*.yaml
+*.yml
+
+# Node modules (if any)
+node_modules/
+
+# Package files
+*.nupkg
+*.snupkg

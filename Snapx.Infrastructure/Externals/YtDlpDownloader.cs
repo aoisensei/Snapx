@@ -11,7 +11,7 @@ namespace Snapx.Infrastructure.Externals
 {
     public class YtDlpDownloader : IVideoDownloader
     {
-        private readonly string _tempFolder = "/tmp/video-temp";
+        private readonly string _tempFolder = Path.Combine(AppContext.BaseDirectory, "TempStorage");
         private readonly string _ytDlpPath;
         private readonly string _ffmpegPath;
 
@@ -30,7 +30,10 @@ namespace Snapx.Infrastructure.Externals
 
         public async Task<string> DownloadAsync(string url)
         {
-            Directory.CreateDirectory(_tempFolder);
+            if (!Directory.Exists(_tempFolder))
+            {
+                Directory.CreateDirectory(_tempFolder);
+            }
 
             var outputFile = Path.Combine(_tempFolder, $"download_{Guid.NewGuid():N}.%(ext)s");
             var ffmpegDir = Path.GetDirectoryName(_ffmpegPath);
