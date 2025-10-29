@@ -17,6 +17,8 @@ namespace Snapx.Domain.DTOs
         public string? FormatNote { get; set; }
         public string Ext { get; set; } = string.Empty;
         public long? Filesize { get; set; }
+        public long? EstimatedSizeBytes { get; set; }
+        public string? DisplaySize { get; set; }
     }
 
     public class MediaAnalyzeResponseDto

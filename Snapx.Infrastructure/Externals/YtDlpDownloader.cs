@@ -151,7 +151,7 @@ namespace Snapx.Infrastructure.Externals
             return matched;
         }
 
-        public async Task<(string title, string uploader, List<(string formatId, string? formatNote, string ext, long? filesize)>)> GetFormatsAsync(string url)
+        public async Task<(string title, string uploader, double? durationSeconds, List<(string formatId, string? formatNote, string ext, long? filesize, double? tbrKbps)>)> GetFormatsAsync(string url)
         {
             var psi = new ProcessStartInfo
             {
@@ -179,7 +179,13 @@ namespace Snapx.Infrastructure.Externals
             string title = root.TryGetProperty("title", out var t) ? t.GetString() ?? string.Empty : string.Empty;
             string uploader = root.TryGetProperty("uploader", out var u) ? u.GetString() ?? string.Empty : string.Empty;
 
-            var results = new List<(string, string?, string, long?)>();
+            double? durationSeconds = null;
+            if (root.TryGetProperty("duration", out var d) && d.ValueKind == JsonValueKind.Number)
+            {
+                if (d.TryGetDouble(out var dur)) durationSeconds = dur;
+            }
+
+            var results = new List<(string, string?, string, long?, double?)>();
             if (root.TryGetProperty("formats", out var formats) && formats.ValueKind == JsonValueKind.Array)
             {
                 foreach (var f in formats.EnumerateArray())
@@ -196,15 +202,20 @@ namespace Snapx.Infrastructure.Externals
                     {
                         if (fsa.TryGetInt64(out var sizeApprox)) filesize = sizeApprox;
                     }
+                    double? tbrKbps = null;
+                    if (f.TryGetProperty("tbr", out var tbr) && tbr.ValueKind == JsonValueKind.Number)
+                    {
+                        if (tbr.TryGetDouble(out var tbrVal)) tbrKbps = tbrVal;
+                    }
 
                     if (!string.IsNullOrWhiteSpace(formatId) && !string.IsNullOrWhiteSpace(ext))
                     {
-                        results.Add((formatId, formatNote, ext, filesize));
+                        results.Add((formatId, formatNote, ext, filesize, tbrKbps));
                     }
                 }
             }
 
-            return (title, uploader, results);
+            return (title, uploader, durationSeconds, results);
         }
 
     }

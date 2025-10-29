@@ -28,18 +28,18 @@ namespace Snapx.Application.Services
         public async Task<MediaAnalyzeResponseDto> AnalyzeAsync(MediaAnalyzeRequestDto request)
         {
             string url = request.Url.Trim();
-            var (title, uploader, formats) = await _downloader.GetFormatsAsync(url);
+            var (title, uploader, durationSeconds, formats) = await _downloader.GetFormatsAsync(url);
 
             // Build simplified choices for FE: Audio MP3, SD, HD, Full HD, and higher if available
             var simplified = new List<MediaAnalyzeFormatDto>();
 
-            bool IsAudio((string formatId, string? formatNote, string ext, long? filesize) f)
+            bool IsAudio((string formatId, string? formatNote, string ext, long? filesize, double? tbrKbps) f)
             {
                 var note = (f.formatNote ?? string.Empty).ToLower();
                 return note.Contains("audio") || f.ext.Equals("m4a", StringComparison.OrdinalIgnoreCase) || f.ext.Equals("mp3", StringComparison.OrdinalIgnoreCase) || f.ext.Equals("webm", StringComparison.OrdinalIgnoreCase);
             }
 
-            int? ParseHeight((string formatId, string? formatNote, string ext, long? filesize) f)
+            int? ParseHeight((string formatId, string? formatNote, string ext, long? filesize, double? tbrKbps) f)
             {
                 var note = f.formatNote ?? string.Empty;
                 var digits = System.Text.RegularExpressions.Regex.Match(note, @"(\d{3,4})p");
@@ -47,6 +47,18 @@ namespace Snapx.Application.Services
                 // Special cases for sd/hd
                 if (f.formatId.Equals("sd", StringComparison.OrdinalIgnoreCase)) return 480;
                 if (f.formatId.Equals("hd", StringComparison.OrdinalIgnoreCase)) return 720;
+                return null;
+            }
+
+            long? EstimateSizeBytes((string formatId, string? formatNote, string ext, long? filesize, double? tbrKbps) f)
+            {
+                if (f.filesize.HasValue) return f.filesize;
+                if (f.tbrKbps.HasValue && durationSeconds.HasValue)
+                {
+                    // bytes ≈ seconds * (kbps * 1000 / 8)
+                    var bytes = durationSeconds.Value * (f.tbrKbps.Value * 1000.0 / 8.0);
+                    return (long)Math.Round(bytes);
+                }
                 return null;
             }
 
@@ -59,7 +71,9 @@ namespace Snapx.Application.Services
                     FormatId = audio.formatId,
                     FormatNote = "Audio MP3",
                     Ext = "mp3",
-                    Filesize = audio.filesize
+                    Filesize = audio.filesize,
+                    EstimatedSizeBytes = EstimateSizeBytes(audio),
+                    DisplaySize = FormatBytes(EstimateSizeBytes(audio) ?? audio.filesize)
                 });
             }
 
@@ -78,7 +92,9 @@ namespace Snapx.Application.Services
                     FormatId = picked.F.formatId,
                     FormatNote = label,
                     Ext = "mp4",
-                    Filesize = picked.F.filesize
+                    Filesize = picked.F.filesize,
+                    EstimatedSizeBytes = EstimateSizeBytes(picked.F),
+                    DisplaySize = FormatBytes(EstimateSizeBytes(picked.F) ?? picked.F.filesize)
                 };
             }
 
@@ -87,7 +103,7 @@ namespace Snapx.Application.Services
                      ;
             if (!string.IsNullOrEmpty(sd.formatId))
             {
-                simplified.Add(new MediaAnalyzeFormatDto { FormatId = sd.formatId, FormatNote = "SD (≈480p)", Ext = "mp4", Filesize = sd.filesize });
+                simplified.Add(new MediaAnalyzeFormatDto { FormatId = sd.formatId, FormatNote = "SD (≈480p)", Ext = "mp4", Filesize = sd.filesize, EstimatedSizeBytes = EstimateSizeBytes(sd), DisplaySize = FormatBytes(EstimateSizeBytes(sd) ?? sd.filesize) });
             }
             else
             {
@@ -99,7 +115,7 @@ namespace Snapx.Application.Services
             var hd = formats.FirstOrDefault(f => f.formatId.Equals("hd", StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrEmpty(hd.formatId))
             {
-                simplified.Add(new MediaAnalyzeFormatDto { FormatId = hd.formatId, FormatNote = "HD (720p)", Ext = "mp4", Filesize = hd.filesize });
+                simplified.Add(new MediaAnalyzeFormatDto { FormatId = hd.formatId, FormatNote = "HD (720p)", Ext = "mp4", Filesize = hd.filesize, EstimatedSizeBytes = EstimateSizeBytes(hd), DisplaySize = FormatBytes(EstimateSizeBytes(hd) ?? hd.filesize) });
             }
             else
             {
@@ -115,7 +131,7 @@ namespace Snapx.Application.Services
                 .FirstOrDefault();
             if (fhd != null)
             {
-                simplified.Add(new MediaAnalyzeFormatDto { FormatId = fhd.F.formatId, FormatNote = "Full HD (1080p)", Ext = "mp4", Filesize = fhd.F.filesize });
+                simplified.Add(new MediaAnalyzeFormatDto { FormatId = fhd.F.formatId, FormatNote = "Full HD (1080p)", Ext = "mp4", Filesize = fhd.F.filesize, EstimatedSizeBytes = EstimateSizeBytes(fhd.F), DisplaySize = FormatBytes(EstimateSizeBytes(fhd.F) ?? fhd.F.filesize) });
             }
 
             // 2K (1440p), 4K (2160p), 8K (4320p)
@@ -130,7 +146,7 @@ namespace Snapx.Application.Services
                     .FirstOrDefault();
                 if (pick != null)
                 {
-                    simplified.Add(new MediaAnalyzeFormatDto { FormatId = pick.F.formatId, FormatNote = labels[i], Ext = "mp4", Filesize = pick.F.filesize });
+                    simplified.Add(new MediaAnalyzeFormatDto { FormatId = pick.F.formatId, FormatNote = labels[i], Ext = "mp4", Filesize = pick.F.filesize, EstimatedSizeBytes = EstimateSizeBytes(pick.F), DisplaySize = FormatBytes(EstimateSizeBytes(pick.F) ?? pick.F.filesize) });
                 }
             }
 
@@ -146,6 +162,20 @@ namespace Snapx.Application.Services
                 Uploader = uploader,
                 Formats = dedup
             };
+        }
+
+        private static string? FormatBytes(long? bytes)
+        {
+            if (!bytes.HasValue || bytes.Value <= 0) return null;
+            double b = bytes.Value;
+            string[] units = new[] { "B", "KB", "MB", "GB", "TB" };
+            int i = 0;
+            while (b >= 1024 && i < units.Length - 1)
+            {
+                b /= 1024;
+                i++;
+            }
+            return $"{b:0.##} {units[i]}";
         }
 
         public async Task<MediaDownloadResponseDto> DownloadVideoAsync(MediaDownloadRequestDto request)
