@@ -11,12 +11,15 @@ builder.Services.AddHealthChecks();
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowLocalhost3001", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3001")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+        policy.WithOrigins(
+                "http://localhost:3001",
+                "https://snapx.thanhnlt.com"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -26,7 +29,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 app.UseStaticFiles();
 
-app.UseCors("AllowLocalhost3001");
+app.UseCors("AllowFrontend");
 
 app.UseAuthorization();
 
