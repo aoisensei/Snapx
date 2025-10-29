@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snapx-api
+  labels:
+    app: snapx-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: snapx-api
+  template:
+    metadata:
+      labels:
+        app: snapx-api
+    spec:
+      containers:
+        - name: snapx-api
+          image: snapx-api:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            - name: ASPNETCORE_URLS
+              value: "http://+:80"
+            - name: FFMPEG_PATH
+              value: "ffmpeg"
+            - name: FFPROBE_PATH
+              value: "ffprobe"
+            - name: YTDLP_PATH
+              value: "yt-dlp"
+          volumeMounts:
+            - name: temp-storage
+              mountPath: /app/TempStorage
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: temp-storage
+          emptyDir: {}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: snapx-api-service
+  labels:
+    app: snapx-api
+  annotations:
+    # annotation này giúp Ingress nhận diện backend nếu sau này bạn mở public
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+  selector:
+    app: snapx-api
