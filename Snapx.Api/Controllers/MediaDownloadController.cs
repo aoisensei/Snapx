@@ -16,11 +16,18 @@ namespace Snapx.Api.Controllers
             _service = service;
         }
 
+        [HttpPost("media-analyze")]
+        public async Task<IActionResult> Analyze([FromBody] MediaAnalyzeRequestDto request)
+        {
+            var result = await _service.AnalyzeAsync(request);
+            return Ok(result);
+        }
+
         [HttpPost("media-download")]
         public async Task<IActionResult> Download([FromBody] MediaDownloadRequestDto request)
         {
             var result = await _service.DownloadVideoAsync(request);
-            return PhysicalFile(result.FilePath, "video/mp4", result.FileName);
+            return PhysicalFile(result.FilePath, result.ContentType, result.FileName);
         }
     }
 }

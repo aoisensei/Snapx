@@ -9,6 +9,7 @@ namespace Snapx.Application.Interfaces
 {
     public interface IMediaDownloadService
     {
+        Task<MediaAnalyzeResponseDto> AnalyzeAsync(MediaAnalyzeRequestDto requestDto);
         Task<MediaDownloadResponseDto> DownloadVideoAsync(MediaDownloadRequestDto requestDto);
     }
 }

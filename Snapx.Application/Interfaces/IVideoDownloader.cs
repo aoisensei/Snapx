@@ -10,5 +10,7 @@ namespace Snapx.Application.Interfaces
     public interface IVideoDownloader
     {
         Task<string> DownloadAsync(string url);
+        Task<string> DownloadAsync(string url, string formatId, string fileType);
+        Task<(string title, string uploader, List<(string formatId, string? formatNote, string ext, long? filesize)>)> GetFormatsAsync(string url);
     }
 }
