@@ -73,7 +73,7 @@ namespace Snapx.Application.Services
             // MP3: lấy max displaySize từ options audio nếu có, else null
             string? bestMp3DisplaySize = options.Where(x=>x.Ext=="mp3").MaxBy(x=>x.EstimatedSizeBytes)?.DisplaySize;
             var qualityMp3 = new MediaAnalyzeFormatDto{
-                FormatId = "",
+                FormatId = "tnlt_mp3",
                 FormatNote = "Chất lượng tốt nhất",
                 Ext = "mp3",
                 Filesize = null,
@@ -82,7 +82,7 @@ namespace Snapx.Application.Services
             };
             string? bestMp4DisplaySize = options.Where(x => x.Ext == "mp4").MaxBy(x => x.EstimatedSizeBytes)?.DisplaySize;
             var qualityMp4 = new MediaAnalyzeFormatDto{
-                FormatId = "",
+                FormatId = "tnlt_mp4",
                 FormatNote = "Chất lượng tốt nhất",
                 Ext = "mp4",
                 Filesize = null,
@@ -123,6 +123,11 @@ namespace Snapx.Application.Services
             string platform = DetectPlatform(url);
             string fileType = request.FileType?.Trim().ToLower();
             string formatId = request.FormatId?.Trim() ?? string.Empty;
+
+            if (request.FormatId?.Trim().ToLower() == "tnlt_mp3" || request.FormatId?.Trim().ToLower() == "tnlt_mp4")
+            {
+                formatId = string.Empty;
+            }
 
             string tempFile;
             if (fileType == "mp3")
