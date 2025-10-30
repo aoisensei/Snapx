@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: snapx-api
-          image: kuronejiaoi/snapx-api:v4
+          image: kuronejiaoi/snapx-api:v11
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -27,11 +27,11 @@ spec:
             - name: ASPNETCORE_URLS
               value: "http://+:80"
             - name: FFMPEG_PATH
-              value: "ffmpeg"
+              value: "/usr/bin/ffmpeg"
             - name: FFPROBE_PATH
-              value: "ffprobe"
+              value: "/usr/bin/ffprobe"
             - name: YTDLP_PATH
-              value: "yt-dlp"
+              value: "/usr/local/bin/yt-dlp"
           volumeMounts:
             - name: temp-storage
               mountPath: /app/TempStorage
