@@ -29,138 +29,51 @@ namespace Snapx.Application.Services
         {
             string url = request.Url.Trim();
             var (title, uploader, durationSeconds, formats) = await _downloader.GetFormatsAsync(url);
-
-            // Build simplified choices for FE: Audio MP3, SD, HD, Full HD, and higher if available
-            var simplified = new List<MediaAnalyzeFormatDto>();
-
-            bool IsAudio((string formatId, string? formatNote, string ext, long? filesize, double? tbrKbps) f)
-            {
-                var note = (f.formatNote ?? string.Empty).ToLower();
-                return note.Contains("audio") || f.ext.Equals("m4a", StringComparison.OrdinalIgnoreCase) || f.ext.Equals("mp3", StringComparison.OrdinalIgnoreCase) || f.ext.Equals("webm", StringComparison.OrdinalIgnoreCase);
-            }
-
-            int? ParseHeight((string formatId, string? formatNote, string ext, long? filesize, double? tbrKbps) f)
-            {
-                var note = f.formatNote ?? string.Empty;
-                var digits = System.Text.RegularExpressions.Regex.Match(note, @"(\d{3,4})p");
-                if (digits.Success && int.TryParse(digits.Groups[1].Value, out var h)) return h;
-                // Special cases for sd/hd
-                if (f.formatId.Equals("sd", StringComparison.OrdinalIgnoreCase)) return 480;
-                if (f.formatId.Equals("hd", StringComparison.OrdinalIgnoreCase)) return 720;
-                return null;
-            }
-
-            long? EstimateSizeBytes((string formatId, string? formatNote, string ext, long? filesize, double? tbrKbps) f)
-            {
-                if (f.filesize.HasValue) return f.filesize;
-                if (f.tbrKbps.HasValue && durationSeconds.HasValue)
-                {
-                    // bytes ≈ seconds * (kbps * 1000 / 8)
-                    var bytes = durationSeconds.Value * (f.tbrKbps.Value * 1000.0 / 8.0);
-                    return (long)Math.Round(bytes);
-                }
-                return null;
-            }
-
-            // AUDIO MP3
-            var audio = formats.FirstOrDefault(IsAudio);
+            var options = new List<MediaAnalyzeFormatDto>();
+            // AUDIO
+            var audio = formats
+                .Where(f => !string.IsNullOrWhiteSpace(f.acodec) && f.acodec != "none" && (string.IsNullOrWhiteSpace(f.vcodec) || f.vcodec == "none"))
+                .OrderByDescending(f => f.tbrKbps ?? 0)
+                .FirstOrDefault();
             if (!string.IsNullOrEmpty(audio.formatId))
             {
-                simplified.Add(new MediaAnalyzeFormatDto
+                options.Add(new MediaAnalyzeFormatDto
                 {
                     FormatId = audio.formatId,
                     FormatNote = "Audio MP3",
-                    Ext = "mp3",
+                    Ext = audio.ext,
                     Filesize = audio.filesize,
-                    EstimatedSizeBytes = EstimateSizeBytes(audio),
-                    DisplaySize = FormatBytes(EstimateSizeBytes(audio) ?? audio.filesize)
+                    EstimatedSizeBytes = audio.filesize,
+                    DisplaySize = FormatBytes(audio.filesize),
                 });
             }
-
-            // Helper to pick best format by minimum height target
-            MediaAnalyzeFormatDto? PickByMinHeight(int minHeight, string label)
+            // VIDEO: SD/HD/FHD
+            (int, string)[] heights = { (480, "SD (≈480p)"), (720, "HD (720p)"), (1080, "Full HD (1080p)") };
+            foreach (var (minHeight, label) in heights)
             {
-                var candidates = formats
-                    .Select(f => new { F = f, H = ParseHeight(f) })
-                    .Where(x => x.H.HasValue && x.H.Value >= minHeight)
-                    .OrderBy(x => x.H!.Value)
-                    .ToList();
-                var picked = candidates.FirstOrDefault();
-                if (picked == null) return null;
-                return new MediaAnalyzeFormatDto
-                {
-                    FormatId = picked.F.formatId,
-                    FormatNote = label,
-                    Ext = "mp4",
-                    Filesize = picked.F.filesize,
-                    EstimatedSizeBytes = EstimateSizeBytes(picked.F),
-                    DisplaySize = FormatBytes(EstimateSizeBytes(picked.F) ?? picked.F.filesize)
-                };
-            }
-
-            // SD (~480p)
-            var sd = formats.FirstOrDefault(f => f.formatId.Equals("sd", StringComparison.OrdinalIgnoreCase))
-                     ;
-            if (!string.IsNullOrEmpty(sd.formatId))
-            {
-                simplified.Add(new MediaAnalyzeFormatDto { FormatId = sd.formatId, FormatNote = "SD (≈480p)", Ext = "mp4", Filesize = sd.filesize, EstimatedSizeBytes = EstimateSizeBytes(sd), DisplaySize = FormatBytes(EstimateSizeBytes(sd) ?? sd.filesize) });
-            }
-            else
-            {
-                var sdPicked = PickByMinHeight(480, "SD (≈480p)");
-                if (sdPicked != null) simplified.Add(sdPicked);
-            }
-
-            // HD (720p)
-            var hd = formats.FirstOrDefault(f => f.formatId.Equals("hd", StringComparison.OrdinalIgnoreCase));
-            if (!string.IsNullOrEmpty(hd.formatId))
-            {
-                simplified.Add(new MediaAnalyzeFormatDto { FormatId = hd.formatId, FormatNote = "HD (720p)", Ext = "mp4", Filesize = hd.filesize, EstimatedSizeBytes = EstimateSizeBytes(hd), DisplaySize = FormatBytes(EstimateSizeBytes(hd) ?? hd.filesize) });
-            }
-            else
-            {
-                var hdPicked = PickByMinHeight(720, "HD (720p)");
-                if (hdPicked != null) simplified.Add(hdPicked);
-            }
-
-            // Full HD (1080p)
-            var fhd = formats
-                .Select(f => new { F = f, H = ParseHeight(f) })
-                .Where(x => x.H == 1080)
-                .OrderByDescending(x => x.F.filesize ?? 0)
-                .FirstOrDefault();
-            if (fhd != null)
-            {
-                simplified.Add(new MediaAnalyzeFormatDto { FormatId = fhd.F.formatId, FormatNote = "Full HD (1080p)", Ext = "mp4", Filesize = fhd.F.filesize, EstimatedSizeBytes = EstimateSizeBytes(fhd.F), DisplaySize = FormatBytes(EstimateSizeBytes(fhd.F) ?? fhd.F.filesize) });
-            }
-
-            // 2K (1440p), 4K (2160p), 8K (4320p)
-            int[] heights = new[] { 1440, 2160, 4320 };
-            string[] labels = new[] { "2K (1440p)", "4K (2160p)", "8K (4320p)" };
-            for (int i = 0; i < heights.Length; i++)
-            {
-                var pick = formats
-                    .Select(f => new { F = f, H = ParseHeight(f) })
-                    .Where(x => x.H == heights[i])
-                    .OrderByDescending(x => x.F.filesize ?? 0)
+                var f = formats
+                    .Where(x => (x.height ?? 0) >= minHeight && !string.IsNullOrWhiteSpace(x.vcodec) && x.vcodec != "none" && !string.IsNullOrWhiteSpace(x.acodec) && x.acodec != "none")
+                    .OrderBy(x => x.height)
+                    .ThenByDescending(x => x.tbrKbps ?? 0)
                     .FirstOrDefault();
-                if (pick != null)
+                if (!string.IsNullOrEmpty(f.formatId) && options.All(opt => opt.FormatId != f.formatId))
                 {
-                    simplified.Add(new MediaAnalyzeFormatDto { FormatId = pick.F.formatId, FormatNote = labels[i], Ext = "mp4", Filesize = pick.F.filesize, EstimatedSizeBytes = EstimateSizeBytes(pick.F), DisplaySize = FormatBytes(EstimateSizeBytes(pick.F) ?? pick.F.filesize) });
+                    options.Add(new MediaAnalyzeFormatDto
+                    {
+                        FormatId = f.formatId,
+                        FormatNote = label,
+                        Ext = f.ext,
+                        Filesize = f.filesize,
+                        EstimatedSizeBytes = f.filesize,
+                        DisplaySize = FormatBytes(f.filesize),
+                    });
                 }
             }
-
-            // De-duplicate by FormatNote label, keep first occurrence
-            var dedup = simplified
-                .GroupBy(x => x.FormatNote)
-                .Select(g => g.First())
-                .ToList();
-
             return new MediaAnalyzeResponseDto
             {
                 Title = title,
                 Uploader = uploader,
-                Formats = dedup
+                Formats = options
             };
         }
 
@@ -177,6 +90,7 @@ namespace Snapx.Application.Services
             }
             return $"{b:0.##} {units[i]}";
         }
+
 
         public async Task<MediaDownloadResponseDto> DownloadVideoAsync(MediaDownloadRequestDto request)
         {
@@ -236,12 +150,6 @@ namespace Snapx.Application.Services
 
             if (url.Contains("facebook.com") || url.Contains("fb.watch"))
                 return "Facebook";
-
-            if (url.Contains("reddit.com"))
-                return "Reddit";
-
-            if (url.Contains("twitch.tv") || url.Contains("clips.twitch.tv"))
-                return "Twitch";
 
             if (url.Contains("pornhub.com"))
                 return "Pornhub";

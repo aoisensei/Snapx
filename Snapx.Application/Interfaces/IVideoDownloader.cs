@@ -11,6 +11,6 @@ namespace Snapx.Application.Interfaces
     {
         Task<string> DownloadAsync(string url);
         Task<string> DownloadAsync(string url, string formatId, string fileType);
-        Task<(string title, string uploader, double? durationSeconds, List<(string formatId, string? formatNote, string ext, long? filesize, double? tbrKbps)>)> GetFormatsAsync(string url);
+        Task<(string title, string uploader, double? durationSeconds, List<(string formatId, string? formatNote, string ext, long? filesize, double? tbrKbps, string? vcodec, string? acodec, int? height)>)> GetFormatsAsync(string url);
     }
 }
