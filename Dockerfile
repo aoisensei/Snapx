@@ -13,10 +13,11 @@
     # Restore dependencies
     RUN dotnet restore "Snapx.Api/Snapx.Api.csproj"
     
-    # Copy all source code and build
+    # Copy all source code and publish
     COPY . .
     WORKDIR "/src/Snapx.Api"
     RUN dotnet publish "Snapx.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+    
     
     # ----------------------------
     # Runtime stage
@@ -24,29 +25,30 @@
     FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
     WORKDIR /app
     
-    # Install ffmpeg + latest yt-dlp
+    # Install ffmpeg, python3 (for yt-dlp auto-update), and curl
     RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         ffmpeg \
+        python3 \
         && rm -rf /var/lib/apt/lists/*
     
-    # Install latest yt-dlp directly from official GitHub
+    # Install latest yt-dlp from GitHub
     RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
         && chmod a+rx /usr/local/bin/yt-dlp
     
     # Copy published app
     COPY --from=build /app/publish .
     
-    # Prepare TempStorage folder
+    # Create TempStorage folder
     RUN mkdir -p /app/TempStorage
     
     # Environment setup
     ENV ASPNETCORE_URLS=http://+:80
     ENV ASPNETCORE_ENVIRONMENT=Production
     
+    # Expose port
     EXPOSE 80
     
-    # Optional: Auto-update yt-dlp on container start
-    ENTRYPOINT bash -c "yt-dlp -U || true && dotnet Snapx.Api.dll"
-    
+    # Auto-update yt-dlp on container start, then run the API
+    ENTRYPOINT ["/bin/bash", "-c", "yt-dlp -U || true && dotnet Snapx.Api.dll"]    
