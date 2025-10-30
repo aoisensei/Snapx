@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: snapx-api
-          image: kuronejiaoi/snapx-api:v1
+          image: kuronejiaoi/snapx-api:v3
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

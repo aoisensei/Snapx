@@ -30,24 +30,24 @@ namespace Snapx.Application.Services
             string url = request.Url.Trim();
             var (title, uploader, durationSeconds, formats) = await _downloader.GetFormatsAsync(url);
             var options = new List<MediaAnalyzeFormatDto>();
-            // AUDIO
+            // AUDIO (always ext mp3)
             var audio = formats
                 .Where(f => !string.IsNullOrWhiteSpace(f.acodec) && f.acodec != "none" && (string.IsNullOrWhiteSpace(f.vcodec) || f.vcodec == "none"))
                 .OrderByDescending(f => f.tbrKbps ?? 0)
                 .FirstOrDefault();
-            if (!string.IsNullOrEmpty(audio.formatId))
+            if (audio != default && !string.IsNullOrEmpty(audio.formatId))
             {
                 options.Add(new MediaAnalyzeFormatDto
                 {
                     FormatId = audio.formatId,
                     FormatNote = "Audio MP3",
-                    Ext = audio.ext,
+                    Ext = "mp3",
                     Filesize = audio.filesize,
                     EstimatedSizeBytes = audio.filesize,
                     DisplaySize = FormatBytes(audio.filesize),
                 });
             }
-            // VIDEO: SD/HD/FHD
+            // VIDEO: SD/HD/FHD (always ext mp4)
             (int, string)[] heights = { (480, "SD (≈480p)"), (720, "HD (720p)"), (1080, "Full HD (1080p)") };
             foreach (var (minHeight, label) in heights)
             {
@@ -56,19 +56,44 @@ namespace Snapx.Application.Services
                     .OrderBy(x => x.height)
                     .ThenByDescending(x => x.tbrKbps ?? 0)
                     .FirstOrDefault();
-                if (!string.IsNullOrEmpty(f.formatId) && options.All(opt => opt.FormatId != f.formatId))
+                if (f != default && !string.IsNullOrEmpty(f.formatId) && options.All(opt => opt.FormatId != f.formatId))
                 {
                     options.Add(new MediaAnalyzeFormatDto
                     {
                         FormatId = f.formatId,
                         FormatNote = label,
-                        Ext = f.ext,
+                        Ext = "mp4",
                         Filesize = f.filesize,
                         EstimatedSizeBytes = f.filesize,
                         DisplaySize = FormatBytes(f.filesize),
                     });
                 }
             }
+            // Thêm option "Chất lượng tốt nhất" cho mp3 (audio) và mp4 (video)
+            // MP3: lấy max displaySize từ options audio nếu có, else null
+            string? bestMp3DisplaySize = options.Where(x=>x.Ext=="mp3").MaxBy(x=>x.EstimatedSizeBytes)?.DisplaySize;
+            var qualityMp3 = new MediaAnalyzeFormatDto{
+                FormatId = "",
+                FormatNote = "Chất lượng tốt nhất",
+                Ext = "mp3",
+                Filesize = null,
+                EstimatedSizeBytes = null,
+                DisplaySize = bestMp3DisplaySize
+            };
+            string? bestMp4DisplaySize = options.Where(x => x.Ext == "mp4").MaxBy(x => x.EstimatedSizeBytes)?.DisplaySize;
+            var qualityMp4 = new MediaAnalyzeFormatDto{
+                FormatId = "",
+                FormatNote = "Chất lượng tốt nhất",
+                Ext = "mp4",
+                Filesize = null,
+                EstimatedSizeBytes = null,
+                DisplaySize = bestMp4DisplaySize
+            };
+            // Remove if present already (avoid dup)
+            options.RemoveAll(x => x.FormatId == "" && x.Ext == "mp3");
+            options.RemoveAll(x => x.FormatId == "" && x.Ext == "mp4");
+            options.Add(qualityMp3);
+            options.Add(qualityMp4);
             return new MediaAnalyzeResponseDto
             {
                 Title = title,
